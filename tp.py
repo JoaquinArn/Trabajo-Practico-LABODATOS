@@ -16,25 +16,63 @@ bibliotecas_populares = pd.read_csv('bibliotecas-populares.csv')
 
 #%%
 consultaSQL = """
-                SELECT cod_localidad, nombre, COUNT(*) AS cantidad
+                SELECT nro_conabip, COUNT(*) AS cantidad
                 FROM bibliotecas_populares
-                GROUP BY cod_localidad, nombre;
+                GROUP BY nro_conabip;
               """
 dataframeResultado = dd.sql(consultaSQL).df()
 
-# con esta consulta, ví que la Bib.Pop Florentino Ameghino (cod_localidad: 6441030) está repetida
+# con esta consulta, ví que nro_conabip es la PK de BP
+
 
 #%%
 consultaSQL = """
-                SELECT *
-                FROM bibliotecas_populares
-                WHERE (
-                    SELECT COUNT(*) 
-                    FROM bibliotecas_populares AS b2
-                    WHERE b2.cod_localidad = bibliotecas_populares.cod_localidad
-                    AND b2.nombre = bibliotecas_populares.nombre
-                    ) > 1;
+                SELECT DISTINCT Cueanexo
+                FROM establecimientos_educativos
               """
 dataframeResultado = dd.sql(consultaSQL).df()
-# con esta consulta, veo que no son iguales pero por alguna razón tienen el mismo cod_localidad cuando pertenecen a distintas localidades
-# es raro el mail de una de las dos pues su mail no da indicios de que se está hablando de una bp llamada Florentino Ameghino
+#esto verifica que la PK de EE es Cueanexo
+
+
+#%%
+def proporcion_columnas_nulas(df):
+    cant_columnas_totales = len(df.columns)
+    cant_columnas_vacias = 0
+    for columna in df.columns:
+        todos_nulos = True
+        for elemento in df[columna]:
+            if pd.notna(elemento):
+                todos_nulos = False
+                break
+            
+        if (todos_nulos):
+            cant_columnas_vacias += 1
+    return (cant_columnas_vacias * 100)/cant_columnas_totales
+
+cant_columnas_nulas_BP = proporcion_columnas_nulas(bibliotecas_populares)
+#%%
+def porcentaje_EE_sin_telefono(df):
+    cant_EE_sin_telefono = 0
+    cant_EE_totales = len(df)
+    for fila in df.itertuples():
+        if (fila.Teléfono == 'N/D' or fila.Teléfono == 'S/D'):
+            cant_EE_sin_telefono +=1
+    return (cant_EE_sin_telefono*100)/cant_EE_totales
+
+ee_sin_nro_telefono= porcentaje_EE_sin_telefono(establecimientos_educativos)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
