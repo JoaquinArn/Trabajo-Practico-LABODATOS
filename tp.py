@@ -100,7 +100,7 @@ while i < n_rows:
 
     i += 1
 
-# 6) Concateno todo
+#Concateno
 
 resultado = pd.concat(segmentos, ignore_index=True)
 resultado = resultado.drop(resultado.columns[0], axis=1) #Elimino la columna A que esta llena de NULLS
