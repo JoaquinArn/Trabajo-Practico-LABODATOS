@@ -98,14 +98,51 @@ consultaSQL = """
               """
 
 bp = dd.sql(consultaSQL).df()
+#%%
+consultaSQL = """
+                SELECT nro_conabip, id_departamento AS id_depto, mail, fecha_fundacion
+                FROM bibliotecas_populares
+                WHERE mail IS NOT NULL
+              """
+
+b = dd.sql(consultaSQL).df()
+
+#devolvió 1022 filas
+
+consultaSQL = """
+                SELECT nro_conabip, id_departamento AS id_depto, mail, fecha_fundacion
+                FROM bibliotecas_populares
+                WHERE mail LIKE '%@%'
+              """
+r = dd.sql(consultaSQL).df()
+#devolvió 1022 filas, lo que implica que todos los mails llevan un @
+#es así que identifico las que tienen dos (o más) mails contando los @ que tiene
+
+consultaSQL = """
+                SELECT nro_conabip, id_departamento AS id_depto, mail, fecha_fundacion
+                FROM bibliotecas_populares
+                WHERE mail LIKE '%@%@%'
+              """
+re = dd.sql(consultaSQL).df()
+#devolvió una única fila. Observamos que ésta biblioteca no posee dos mails, sino que está el mismo
+#hacemos limpieza
+
+bp['mail'] = bp['mail'].replace({'sanestebanbibliotecapopular@yahoo.com.ar <SANESTEBANBIBLIOTECAPOPULAR@YAHOO.COM.AR>': 'sanestebanbibliotecapopular@yahoo.com.ar'})
+
+#Luego, cambiamos el id de Chascomús de 6217 a 6218 que es el que indican las tablas EE y PP
+bp['id_depto'] = bp['id_depto'].replace({6217: 6218})
+
+
 
 #%% AHORA LAS QUE VAMOS A USAR: localizacion_ee
 
 localizacion_ee = ee[[('Establecimiento - Localización', 'Cueanexo'), ('Establecimiento - Localización', 'Código de localidad')]]
 nuevas_columnas = ['cueanexo', 'id_depto'] #renombro las columnas
 localizacion_ee.columns = nuevas_columnas
-localizacion_ee['id_depto'] = localizacion_ee['id_depto']//1000
+localizacion_ee.astype(int)
+localizacion_ee.loc[:, 'id_depto'] = localizacion_ee['id_depto'] // 1000
 
+localizacion_ee = localizacion_ee.where((localizacion_ee['id_depto']//1000) == 2, 2000) # si empieza con 2 es de capi, entonces ponemos 2000
 #%% AHORA LAS QUE VAMOS A USAR: nivel_educativo_ee
 
 #Yo quiero armar dos listas a las cuales pasar después a un diccionario
@@ -178,21 +215,41 @@ pp = dd.sql(consultaSQL).df()
 for indice, fila in pp.iterrows():
     if (int(fila['Area']) < 10000) :
         pp.at[indice, 'Area'] = fila['Area'][1:]
+        
 
 #%%
 
 consultaSQL = """
-                SELECT Area, CAST(Area AS INTEGER)//1000 AS id_depto, Nombre AS nombre_depto, pob_infantes, pob_primaria, pob_secundaria, pob_total 
+                SELECT Area AS id_depto, Nombre AS nombre_depto, CAST(Area AS INTEGER)//1000 AS id_provincia, pob_infantes, pob_primaria, pob_secundaria, pob_total 
                 FROM pp
               """
 
 departamento = dd.sql(consultaSQL).df()
 
+# Además, vamos a modificar los códigos de area de Ushuaia y Río Grande, pues en las tablas de establecimientos y bibliotecas aparecen con otros
+departamento['id_depto'] = departamento['id_depto'].astype(int)
+
+departamento['id_depto'] = departamento['id_depto'].replace({94008: 94007, 94015: 94014})
+
+#Ahora todas las comunas las encapsulamos en una única fila que sea Ciudad de Buenos Aires
+
+for nombre in departamento['nombre_depto']:
+    if (nombre.startswith('Comuna')):
+        departamento['nombre_depto'] = departamento['nombre_depto'].replace({nombre: 'Ciudad de Buenos Aires'})
+
+# Filtrar solo las filas con nombre "Ciudad de Buenos Aires"
+departamentos_de_ciudad_bsas = departamento[departamento['nombre_depto'] == 'Ciudad de Buenos Aires'].groupby('nombre_depto')[['pob_infantes', 'pob_total', 'pob_primaria', 'pob_secundaria']].sum().reset_index()
+departamentos_de_ciudad_bsas['id_depto'] = 2000
+departamentos_de_ciudad_bsas['id_provincia'] = 2
+
+# Filtrar el resto del DataFrame (sin las filas agrupadas)
+departamentos_fuera_de_ciudad_bsas = departamento[departamento['nombre_depto'] != 'Ciudad de Buenos Aires']
+
+# Combinamos ambos
+departamento = pd.concat([departamentos_fuera_de_ciudad_bsas, departamentos_de_ciudad_bsas], ignore_index=True)
 
 
-
-
-#%% AHORA LAS QUE VAMOS A USAR: jurisdiccion_departamento
+#%% NO LA VAMOS A USAR, PERO POR LAS DUDAS: jurisdiccion_departamento
 
 
 jurisdiccion_departamento = ee[[('Establecimiento - Localización', 'Departamento'), ('Establecimiento - Localización', 'Jurisdicción')]].drop_duplicates()
